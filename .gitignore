@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 빌드 중간 산출물 (최종 HTML에 이미 내장됨)
+chartjs.min.js
+xlsx.min.js
+data_2025.js
+data_2025_min.js
+
+# 원본 데이터 (개인정보/병원 내부자료)
+25 data/
