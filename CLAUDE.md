@@ -8,22 +8,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **실행**: `index.html`을 Chrome/Edge로 열면 즉시 동작 (더블클릭)
 - **빌드/테스트/린트 명령 없음** — 순수 HTML+CSS+Vanilla JS 단일 파일
+- **GitHub Pages**: `main` 브랜치 root(`/`) 서빙 중
 
 ## 파일 구조
 
 ```
-index.html          # 전체 앱 (데이터·라이브러리·로직·UI 모두 포함)
+index.html          # 전체 앱 (데이터·라이브러리·로직·UI 모두 포함, ~2,790줄)
 briefing/           # 수동 작성된 마케팅 타겟 브리핑 MD 파일
 plan/               # PRD·기획안·와이어프레임 문서
+25 data/            # 원본 엑셀 데이터 (.gitignore — 커밋 금지)
+chartjs.min.js      # 라이브러리 원본 (.gitignore — index.html에 인라인 내장됨)
+xlsx.min.js         # 라이브러리 원본 (.gitignore)
+data_2025.js        # 원본 추출 데이터 (.gitignore)
+data_2025_min.js    # 최소화 데이터 (.gitignore)
 ```
 
-## index.html 내부 구조
+## index.html 내부 구조 (라인 기준)
 
-파일은 약 2,500줄 이상이며, 순서대로 다음으로 구성된다:
+파일은 ~2,790줄이며, 순서대로 구성된다:
 
-1. **인라인 라이브러리** — Chart.js 4.4.0, SheetJS 0.20.1 (CDN 불필요)
-2. **`const D25`** (line ~1362) — 2025년 진료실적(`p`)·진단별 통계(`d`) 데이터 JS 객체로 내장. 병원 키: `daejeon` / `yuseong`
-3. **상수·매핑** (line ~1367~1660)
+1. **인라인 라이브러리** (line 1~) — Chart.js 4.4.0, SheetJS 0.20.1 (CDN 불필요)
+2. **`const D25`** (line ~1362) — 2025년 진료실적(`p`)·진단별 통계(`d`) 데이터 JS 객체. 병원 키: `daejeon` / `yuseong`
+3. **상수·매핑** (line ~1367~1700)
    - `MONTHS`, `QTR`, `SEASON` — 기간 분류 정의
    - `SEASONAL_BONUS` — 계절별 마케팅 타겟 전략 가중치 (봄/여름/가을/겨울)
    - `QUARTERLY_BONUS` — 분기별 전략 가중치 (Q1~Q4)
@@ -37,14 +43,46 @@ plan/               # PRD·기획안·와이어프레임 문서
 
 ## 핵심 데이터 구조
 
-### D25 진료실적 배열 인덱스
+### D25 / data26 진료실적 배열 인덱스
 
 ```
 r[0]  = 과코드
+r[1]  = 일반
+r[2]  = 보험
+r[3]  = 보호(의료급여)
+r[4]  = 자보
+r[5]  = 산재
+r[6]  = 기타
 r[7]  = 신환
 r[8]  = 초진
 r[9]  = 재진
+r[10] = 남자
+r[11] = 여자
+r[12] = 선택진료
+r[13] = 일반진료
 r[14] = 계(총 환자수)
+```
+
+### D25 진단별 통계 배열 인덱스
+
+```
+r[0] = 과코드
+r[1] = 입력자명(의사명)
+r[2] = 진단코드
+r[3] = 진단명
+r[4] = 건수
+```
+
+### App 전역 상태 주요 필드
+
+```javascript
+App.hospital          // 'daejeon' | 'yuseong'
+App.year              // '2025' | '2026'
+App.has26             // 26년 데이터 업로드 여부 (YoY탭 활성화 조건)
+App.data26            // { daejeon: { p: {}, d: {} }, yuseong: { p: {}, d: {} } }
+App.weights           // { growth: 40, volume: 30, newpt: 30 }
+App.targetPeriodMode  // 'all' | 'quarterly' | 'seasonal'
+App.targetPeriod      // null | 'Q1'~'Q4' | '봄'~'겨울'
 ```
 
 ### 제외 진료과 규칙 (`isExcluded`)
@@ -55,6 +93,7 @@ r[14] = 계(총 환자수)
 | `HPC` | 건강검진센터 |
 | `FM` | 가정의학과 |
 | 코드 끝에 `2` | 미수(수납 미완료) 코드 |
+| `AER` | 응급실 |
 
 ## 복합점수 산출 로직
 
@@ -72,6 +111,17 @@ Composite = 0.40 × Growth_Score + 0.30 × Volume_Score + 0.30 × NewPatient_Sco
 | `NR` | 신경과 |
 | `NS` | 신경외과 |
 | `NP` | 정신건강의학과 |
+| `IMC` | 심장내과 |
+| `IML` | 내과(호흡기) |
+| `SC` | 척추센터 |
+| `JC` | 관절센터 |
+
+## 26년 데이터 업로드 흐름
+
+- 사용자가 진료실적/진단통계 엑셀 파일을 업로드하면 SheetJS로 파싱 → `App.data26`에 저장
+- `App.has26 = true`가 되면 YoY 비교 탭이 활성화됨
+- `getSource()`가 `App.year === '2025'`이면 `D25`, 아니면 `App.data26`를 반환
+- 엑셀 파싱 시 macOS NFD 유니코드로 인한 파일명 문자 깨짐에 주의
 
 ## 계절/분기 보너스 조정 원칙
 
